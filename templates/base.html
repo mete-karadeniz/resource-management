@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="tr" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Resource Planner{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <script>(function(){var t=localStorage.getItem('theme')||'light';document.documentElement.setAttribute('data-theme',t)})();</script>
+</head>
+<body>
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">
+                <i class="fas fa-chart-gantt"></i>
+                <span>RP Tool</span>
+            </div>
+            <button class="sidebar-toggle" onclick="toggleSidebar()">
+                <i class="fas fa-bars"></i>
+            </button>
+        </div>
+
+        <nav class="sidebar-nav">
+            <a href="{{ url_for('dashboard') }}" class="nav-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
+                <i class="fas fa-th-large"></i>
+                <span>Dashboard</span>
+            </a>
+            <a href="{{ url_for('ca_demand') }}" class="nav-item {% if request.endpoint == 'ca_demand' %}active{% endif %}">
+                <i class="fas fa-layer-group"></i>
+                <span>{{ demand_page_name }}</span>
+            </a>
+
+            {% if active_units %}
+            <div class="nav-divider">Üniteler</div>
+            {% for unit in active_units %}
+            <a href="{{ url_for('unit_view', short_name=unit.short_name) }}"
+               class="nav-item {% if request.endpoint == 'unit_view' and request.view_args.get('short_name') == unit.short_name %}active{% endif %}">
+                <i class="{{ unit.icon }}"></i>
+                <span>{{ unit.short_name }}</span>
+            </a>
+            {% endfor %}
+            {% endif %}
+
+            <div class="nav-divider">Araçlar</div>
+
+            <a href="{{ url_for('search') }}" class="nav-item {% if request.endpoint == 'search' %}active{% endif %}">
+                <i class="fas fa-search"></i>
+                <span>Arama</span>
+            </a>
+
+            {% if current_user.is_admin() %}
+            <div class="nav-divider">Yönetim</div>
+
+            <a href="{{ url_for('manage_engagements') }}" class="nav-item {% if request.endpoint == 'manage_engagements' %}active{% endif %}">
+                <i class="fas fa-briefcase"></i>
+                <span>Engagement'lar</span>
+            </a>
+            <a href="{{ url_for('manage_people') }}" class="nav-item {% if request.endpoint == 'manage_people' %}active{% endif %}">
+                <i class="fas fa-users"></i>
+                <span>Kişiler</span>
+            </a>
+            <a href="{{ url_for('admin_settings') }}" class="nav-item {% if request.endpoint == 'admin_settings' %}active{% endif %}">
+                <i class="fas fa-gear"></i>
+                <span>Ayarlar</span>
+            </a>
+            {% endif %}
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="sidebar-user">
+                <div class="sidebar-user-info">
+                    <span class="sidebar-user-name">{{ current_user.display_name }}</span>
+                    <span class="sidebar-user-role">{{ 'Admin' if current_user.is_admin() else 'User' }} · {{ ws_code }}</span>
+                </div>
+                <a href="{{ url_for('logout') }}" class="sidebar-logout" title="Çıkış">
+                    <i class="fas fa-sign-out-alt"></i>
+                </a>
+            </div>
+            <button class="theme-toggle" onclick="toggleTheme()">
+                <i class="fas fa-moon" id="theme-icon"></i>
+                <span id="theme-text">Gece Modu</span>
+            </button>
+        </div>
+    </aside>
+
+    <main class="main-content" id="main-content">
+        <header class="top-bar">
+            <div class="top-bar-left">
+                <button class="mobile-menu-btn" onclick="toggleSidebar()">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <h1 class="page-title">{% block page_title %}Resource Planner{% endblock %}</h1>
+            </div>
+            <div class="top-bar-right">
+                <div class="search-box-mini">
+                    <i class="fas fa-search"></i>
+                    <input type="text" placeholder="Hızlı arama... (Ctrl+K)" id="quick-search"
+                           onkeydown="if(event.key==='Enter') window.location.href='/search?q='+this.value">
+                </div>
+            </div>
+        </header>
+
+        <div class="content-area">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            <div class="flash-container">
+                {% for category, message in messages %}
+                <div class="flash-msg flash-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% endwith %}
+
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+
+    <div class="cell-popup" id="cell-popup">
+        <div class="cell-popup-header">
+            <span id="cell-popup-title">Hücre Düzenle</span>
+            <button onclick="closeCellPopup()" class="cell-popup-close">&times;</button>
+        </div>
+        <div class="cell-popup-body">
+            <label>Saat:</label>
+            <input type="number" id="cell-hours" min="0" max="80" step="1" value="0">
+            <label>Renk:</label>
+            <div class="color-picker">
+                <button class="color-btn color-green active" onclick="selectColor('green', this)" title="Confirmed"></button>
+                <button class="color-btn color-yellow" onclick="selectColor('yellow', this)" title="Tentative"></button>
+                <button class="color-btn color-red" onclick="selectColor('red', this)" title="Overbooked"></button>
+            </div>
+            <div class="cell-popup-actions">
+                <button onclick="saveCellEdit()" class="btn btn-primary btn-sm">Kaydet</button>
+                <button onclick="clearCell()" class="btn btn-outline btn-sm">Temizle</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        var IS_ADMIN = {{ 'true' if current_user.is_admin() else 'false' }};
+    </script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

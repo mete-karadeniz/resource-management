@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="tr" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Giriş - Resource Planner</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <script>(function(){var t=localStorage.getItem('theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
+</head>
+<body class="login-body">
+    <div class="login-container">
+        <div class="login-card">
+            <div class="login-logo">
+                <i class="fas fa-chart-gantt"></i>
+                <h1>Resource Planner</h1>
+                <p>Ekip kaynak planlama aracı</p>
+            </div>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            {% for cat, msg in messages %}
+            <div class="flash-msg flash-{{ cat }}">
+                <i class="fas {% if cat == 'error' %}fa-exclamation-circle{% else %}fa-check-circle{% endif %}"></i>
+                {{ msg }}
+            </div>
+            {% endfor %}
+            {% endif %}
+            {% endwith %}
+
+            <form method="post" class="login-form">
+                <div class="login-field">
+                    <label><i class="fas fa-user"></i> Kullanıcı Adı</label>
+                    <input type="text" name="username" required autofocus placeholder="admin" autocomplete="username">
+                </div>
+                <div class="login-field">
+                    <label><i class="fas fa-lock"></i> Şifre</label>
+                    <input type="password" name="password" required placeholder="••••" autocomplete="current-password">
+                </div>
+                <button type="submit" class="login-btn">
+                    <i class="fas fa-sign-in-alt"></i> Giriş Yap
+                </button>
+            </form>
+
+            <div class="login-divider"><span>veya</span></div>
+
+            <a href="{{ url_for('register') }}" class="register-link-btn">
+                <i class="fas fa-user-plus"></i> Yeni Hesap Oluştur
+            </a>
+
+            <div class="login-theme-toggle">
+                <button onclick="toggleLoginTheme()" class="theme-toggle-mini" id="login-theme-btn">
+                    <i class="fas fa-moon" id="login-theme-icon"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+    <script>
+        function toggleLoginTheme(){var c=document.documentElement.getAttribute('data-theme');var n=c==='dark'?'light':'dark';document.documentElement.setAttribute('data-theme',n);localStorage.setItem('theme',n);var i=document.getElementById('login-theme-icon');if(i)i.className=n==='dark'?'fas fa-sun':'fas fa-moon';}
+        (function(){var t=localStorage.getItem('theme')||'light';var i=document.getElementById('login-theme-icon');if(i)i.className=t==='dark'?'fas fa-sun':'fas fa-moon';})();
+    </script>
+</body>
+</html>

@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% block title %}Kişi Yönetimi{% endblock %}
+{% block page_title %}Kişi Yönetimi{% endblock %}
+
+{% block content %}
+<div class="manage-layout">
+    <div class="manage-form-panel">
+        <div class="panel-title"><i class="fas fa-user-plus"></i> Yeni Kişi</div>
+        <form id="add-person-form" class="manage-form">
+            <div class="field">
+                <label>Ad Soyad</label>
+                <input type="text" id="person-name" required placeholder="Örn: Ahmet Yılmaz">
+            </div>
+            <div class="field">
+                <label>Title</label>
+                <select id="person-title">
+                    {% for t in active_titles %}
+                    <option value="{{ t.name }}">{{ t.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="field">
+                <label>Ünite(ler)</label>
+                <div class="dept-checks">
+                    {% for u in units %}
+                    <label class="check-item">
+                        <input type="checkbox" name="departments" value="{{ u.short_name }}" {% if loop.first %}checked{% endif %}>
+                        <span class="check-label">{{ u.short_name }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="field">
+                <label>E-posta</label>
+                <input type="email" id="person-email" placeholder="email@pwc.com">
+            </div>
+            <button type="submit" class="submit-btn"><i class="fas fa-plus"></i> Kişi Ekle</button>
+        </form>
+    </div>
+
+    <div class="manage-list-panel">
+        <div class="panel-header">
+            <div class="panel-title"><i class="fas fa-users"></i> Ekip <span class="count-badge">{{ people|length }}</span></div>
+            <div class="panel-header-right">
+                <label class="filter-toggle">
+                    <input type="checkbox" id="show-inactive" onchange="toggleInactiveFilter()">
+                    <span>Deaktif göster</span>
+                </label>
+                <input type="text" class="panel-filter" placeholder="Filtrele..." oninput="filterManageList(this.value, 'people-list')">
+            </div>
+        </div>
+        <div class="manage-list" id="people-list">
+            {% for person in people %}
+            <div class="manage-item {% if not person.is_active %}inactive-person{% endif %}"
+                 id="person-item-{{ person.id }}" data-active="{{ 'true' if person.is_active else 'false' }}">
+                <div class="manage-item-main">
+                    <div class="person-avatar-sm {% if not person.is_active %}avatar-inactive{% endif %}">{{ person.name[0] }}</div>
+                    <div class="manage-item-info">
+                        <div class="manage-item-name">
+                            {{ person.name }}
+                            {% if not person.is_active %}<span class="inactive-label">Deaktif</span>{% endif %}
+                        </div>
+                        <div class="manage-item-meta">
+                            {{ person.title }}
+                            {% for dept in person.get_departments() %}<span class="tag tag-{{ dept|lower }}">{{ dept }}</span>{% endfor %}
+                        </div>
+                    </div>
+                    <div class="manage-item-actions">
+                        <button class="status-toggle-btn {% if person.is_active %}status-active{% else %}status-inactive{% endif %}"
+                                id="status-btn-{{ person.id }}" onclick="togglePersonActive({{ person.id }})">
+                            <i class="fas {% if person.is_active %}fa-toggle-on{% else %}fa-toggle-off{% endif %}"></i>
+                        </button>
+                        <a href="{{ url_for('person_detail', person_id=person.id) }}" class="action-btn"><i class="fas fa-external-link-alt"></i></a>
+                        <button class="action-btn action-delete" onclick="deletePerson({{ person.id }})"><i class="fas fa-trash-alt"></i></button>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('add-person-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    var depts = [];
+    var checks = document.querySelectorAll('input[name="departments"]:checked');
+    for (var i = 0; i < checks.length; i++) depts.push(checks[i].value);
+    if (!depts.length) { alert('En az bir ünite seçin!'); return; }
+    fetch('/api/person', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            name: document.getElementById('person-name').value,
+            title: document.getElementById('person-title').value,
+            departments: depts,
+            email: document.getElementById('person-email').value,
+        })
+    }).then(function(r){ return r.json(); }).then(function(res){ if(res.success) location.reload(); });
+});
+
+function togglePersonActive(id) {
+    fetch('/api/person/' + id + '/toggle-active', { method: 'POST', headers: {'Content-Type':'application/json'} })
+    .then(function(r){ return r.json(); }).then(function(res) {
+        if (res.success) {
+            var item = document.getElementById('person-item-' + id);
+            var btn = document.getElementById('status-btn-' + id);
+            var icon = btn.querySelector('i');
+            var nameEl = item.querySelector('.manage-item-name');
+            var avatar = item.querySelector('.person-avatar-sm');
+            if (res.is_active) {
+                item.classList.remove('inactive-person'); item.dataset.active='true';
+                btn.classList.remove('status-inactive'); btn.classList.add('status-active');
+                icon.classList.remove('fa-toggle-off'); icon.classList.add('fa-toggle-on');
+                avatar.classList.remove('avatar-inactive');
+                var lbl = nameEl.querySelector('.inactive-label'); if(lbl) lbl.remove();
+                showToast(res.name + ' aktif ✓');
+            } else {
+                item.classList.add('inactive-person'); item.dataset.active='false';
+                btn.classList.remove('status-active'); btn.classList.add('status-inactive');
+                icon.classList.remove('fa-toggle-on'); icon.classList.add('fa-toggle-off');
+                avatar.classList.add('avatar-inactive');
+                if (!nameEl.querySelector('.inactive-label')) {
+                    var s = document.createElement('span'); s.className='inactive-label'; s.textContent='Deaktif'; nameEl.appendChild(s);
+                }
+                showToast(res.name + ' deaktif');
+            }
+            toggleInactiveFilter();
+        }
+    });
+}
+
+function toggleInactiveFilter() {
+    var show = document.getElementById('show-inactive').checked;
+    var items = document.querySelectorAll('#people-list .manage-item');
+    for (var i = 0; i < items.length; i++) {
+        items[i].style.display = (items[i].dataset.active === 'false' && !show) ? 'none' : '';
+    }
+}
+document.addEventListener('DOMContentLoaded', toggleInactiveFilter);
+
+function deletePerson(id) {
+    if (!confirm('Silinsin mi?')) return;
+    fetch('/api/person/' + id, { method: 'DELETE' })
+    .then(function(r){ return r.json(); }).then(function(res){
+        if (res.success) { document.getElementById('person-item-' + id).remove(); showToast('Silindi ✓'); }
+    });
+}
+</script>
+{% endblock %}

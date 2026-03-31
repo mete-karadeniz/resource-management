@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}{{ unit.long_name }} - Resource Planner{% endblock %}
+{% block page_title %}{{ unit.long_name }} ({{ unit.short_name }}){% endblock %}
+
+{% block content %}
+<div class="gantt-controls">
+    <div class="gantt-controls-left">
+        <span class="badge badge-info">{{ data|length }} engagement</span>
+        <div class="legend">
+            <span class="legend-item"><span class="legend-dot green"></span> Confirmed</span>
+            <span class="legend-item"><span class="legend-dot yellow"></span> Tentative</span>
+            <span class="legend-item"><span class="legend-dot red"></span> Overbooked</span>
+        </div>
+    </div>
+    <div class="gantt-controls-right"><div class="scroll-hint"><i class="fas fa-arrows-left-right"></i> Yatay kaydır</div></div>
+</div>
+
+<div class="gantt-outer">
+    <div class="gantt-table-container">
+        <table class="gantt-table">
+            <thead>
+                <tr class="month-row">
+                    <th class="sticky-col col-engagement" rowspan="3">Engagement</th>
+                    <th class="sticky-col col-person" rowspan="3">Kişi</th>
+                    <th class="sticky-col col-title" rowspan="3">Title</th>
+                    {% set ns = namespace(cm='') %}
+                    {% for w in weeks %}
+                        {% set mk = w.strftime('%Y-%m') %}
+                        {% if mk != ns.cm %}{% set ns.cm = mk %}
+                            {% set cnt = [] %}{% for ww in weeks %}{% if ww.strftime('%Y-%m') == mk %}{% if cnt.append(1) %}{% endif %}{% endif %}{% endfor %}
+                            <th colspan="{{ cnt|length }}" class="month-cell">{{ get_month_label(w) }} {{ w.year }}</th>
+                        {% endif %}
+                    {% endfor %}
+                </tr>
+                <tr class="totals-row">
+                    {% for w in weeks %}
+                    <th class="week-total-cell {% if weekly_totals[w] > 0 %}has-hours{% endif %}">
+                        {% if weekly_totals[w] > 0 %}{{ weekly_totals[w]|int }}{% endif %}
+                    </th>{% endfor %}
+                </tr>
+                <tr class="week-header-row">
+                    {% for w in weeks %}<th class="week-cell">{{ w.strftime('%d/%m') }}</th>{% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for ed in data %}
+                    {% set eng = ed.engagement %}
+                    {% for pd in ed.persons %}
+                        <tr class="gantt-row">
+                            {% if loop.first %}
+                            <td class="sticky-col col-engagement engagement-cell" rowspan="{{ ed.persons|length }}">
+                                <div class="engagement-info">
+                                    <a href="{{ url_for('engagement_detail', engagement_id=eng.id) }}" class="eng-link">{{ eng.name }}</a>
+                                    <small>{{ eng.client }}</small>
+                                </div>
+                            </td>{% endif %}
+                            <td class="sticky-col col-person"><a href="{{ url_for('person_detail', person_id=pd.person.id) }}" class="person-link">{{ pd.person.name }}</a></td>
+                            <td class="sticky-col col-title">{{ pd.person.title }}</td>
+                            {% for w in weeks %}
+                                {% set b = pd.bookings.get(w) %}
+                                <td class="gantt-cell {% if b and b.hours > 0 %}booked cell-{{ b.color }}{% endif %}"
+                                    data-person-id="{{ pd.person.id }}" data-engagement-id="{{ eng.id }}"
+                                    data-week="{{ w.strftime('%Y-%m-%d') }}" data-hours="{{ b.hours if b else 0 }}"
+                                    data-color="{{ b.color if b else 'green' }}"
+                                    {% if current_user.is_admin() %}onclick="openCellEdit(this)"{% endif %}>
+                                    {% if b and b.hours > 0 %}{{ b.hours|int }}{% endif %}
+                                </td>
+                            {% endfor %}
+                        </tr>
+                    {% endfor %}
+                    {% if not ed.persons %}
+                        <tr class="gantt-row">
+                            <td class="sticky-col col-engagement engagement-cell">
+                                <div class="engagement-info"><a href="{{ url_for('engagement_detail', engagement_id=eng.id) }}" class="eng-link">{{ eng.name }}</a><small>{{ eng.client }}</small></div>
+                            </td>
+                            <td class="sticky-col col-person text-muted" colspan="2"><em>Henüz kişi atanmamış</em></td>
+                            {% for w in weeks %}<td class="gantt-cell empty-cell"></td>{% endfor %}
+                        </tr>
+                    {% endif %}
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - Resource Planner{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="dashboard-grid">
+    <div class="stat-card">
+        <div class="stat-icon blue"><i class="fas fa-users"></i></div>
+        <div class="stat-info">
+            <span class="stat-number">{{ total_people }}</span>
+            <span class="stat-label">Aktif Kişi</span>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon purple"><i class="fas fa-briefcase"></i></div>
+        <div class="stat-info">
+            <span class="stat-number">{{ total_engagements }}</span>
+            <span class="stat-label">Aktif Engagement</span>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon orange"><i class="fas fa-clock"></i></div>
+        <div class="stat-info">
+            <span class="stat-number">{{ current_week_hours|int }}</span>
+            <span class="stat-label">Bu Hafta (saat)</span>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon green"><i class="fas fa-calendar-week"></i></div>
+        <div class="stat-info">
+            <span class="stat-number">{{ current_week.strftime('%d %b %Y') }}</span>
+            <span class="stat-label">Mevcut Hafta</span>
+        </div>
+    </div>
+</div>
+
+<div class="dashboard-section">
+    <h2 class="section-title">Ünite Bazlı Özet</h2>
+    <div class="cat-stats-grid">
+        {% for short, stats in cat_stats.items() %}
+        <div class="cat-stat-card" style="border-left-color: {{ stats.unit.color }};">
+            <h3><i class="{{ stats.unit.icon }}"></i> {{ stats.unit.long_name }} ({{ stats.unit.short_name }})</h3>
+            <div class="cat-stat-details">
+                <div class="cat-stat-item">
+                    <span class="cat-stat-value">{{ stats.people }}</span>
+                    <span class="cat-stat-label">Kişi</span>
+                </div>
+                <div class="cat-stat-item">
+                    <span class="cat-stat-value">{{ stats.engagements }}</span>
+                    <span class="cat-stat-label">Engagement</span>
+                </div>
+                <div class="cat-stat-item">
+                    <span class="cat-stat-value">{{ stats.current_hours|int }}h</span>
+                    <span class="cat-stat-label">Bu Hafta</span>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<div class="dashboard-section">
+    <h2 class="section-title">Haftalık Saat Trendi (12 Hafta)</h2>
+    <div class="chart-container">
+        <canvas id="trendCanvas" height="200"></canvas>
+    </div>
+</div>
+
+<div class="dashboard-section">
+    <h2 class="section-title">Bu Hafta En Yoğun Kişiler</h2>
+    <div class="settings-card">
+        <div class="settings-card-body" style="padding:0;">
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Kişi</th>
+                            <th>Title</th>
+                            <th>Toplam Saat</th>
+                            <th>Utilization</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for person_name, title, total_hours in busy_people %}
+                        <tr>
+                            <td><strong>{{ person_name }}</strong></td>
+                            <td>{{ title }}</td>
+                            <td>{{ total_hours|int }}h</td>
+                            <td>
+                                <div class="util-bar">
+                                    <div class="util-fill {% if total_hours > 40 %}util-over{% elif total_hours >= 32 %}util-high{% else %}util-normal{% endif %}"
+                                         style="width: {{ [total_hours / 40 * 100, 100] | min }}%"></div>
+                                    <span class="util-text">{{ (total_hours / 40 * 100)|round(0)|int }}%</span>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% if not busy_people %}
+                        <tr><td colspan="4" class="text-center text-muted py-3">Bu hafta booking bulunmuyor</td></tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const trendData = {{ trend_data | safe }};
+function drawChart() {
+    const canvas = document.getElementById('trendCanvas');
+    if (!canvas || !trendData.length) return;
+    const container = canvas.parentElement;
+    canvas.width = container.offsetWidth;
+    canvas.height = 200;
+    const ctx = canvas.getContext('2d');
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const textColor = isDark ? '#94a3b8' : '#64748b';
+    const gridColor = isDark ? '#334155' : '#e2e8f0';
+    const pad = { top: 25, right: 20, bottom: 40, left: 50 };
+    const cW = canvas.width - pad.left - pad.right;
+    const cH = canvas.height - pad.top - pad.bottom;
+    const maxH = Math.max(...trendData.map(d => d.hours), 40);
+    const barW = (cW / trendData.length) * 0.7;
+    const gap = (cW / trendData.length) * 0.3;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for (let i = 0; i <= 4; i++) {
+        const y = pad.top + (cH / 4) * i;
+        ctx.strokeStyle = gridColor; ctx.lineWidth = 0.5;
+        ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(canvas.width - pad.right, y); ctx.stroke();
+        ctx.fillStyle = textColor; ctx.font = '11px Inter'; ctx.textAlign = 'right';
+        ctx.fillText(Math.round(maxH - (maxH / 4) * i) + 'h', pad.left - 8, y + 4);
+    }
+    trendData.forEach((d, i) => {
+        const x = pad.left + i * (barW + gap) + gap / 2;
+        const barH = (d.hours / maxH) * cH;
+        const y = pad.top + cH - barH;
+        const grad = ctx.createLinearGradient(x, y, x, pad.top + cH);
+        grad.addColorStop(0, '#6366f1'); grad.addColorStop(1, '#a5b4fc');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        const r = 4;
+        ctx.moveTo(x + r, y); ctx.lineTo(x + barW - r, y);
+        ctx.quadraticCurveTo(x + barW, y, x + barW, y + r);
+        ctx.lineTo(x + barW, pad.top + cH); ctx.lineTo(x, pad.top + cH);
+        ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y);
+        ctx.fill();
+        ctx.fillStyle = textColor; ctx.font = '10px Inter'; ctx.textAlign = 'center';
+        ctx.fillText(d.week, x + barW / 2, pad.top + cH + 20);
+        if (d.hours > 0) {
+            ctx.fillStyle = isDark ? '#e2e8f0' : '#1e293b'; ctx.font = 'bold 10px Inter';
+            ctx.fillText(d.hours + 'h', x + barW / 2, y - 6);
+        }
+    });
+}
+drawChart();
+window.addEventListener('resize', drawChart);
+</script>
+{% endblock %}

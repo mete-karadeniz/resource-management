@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}Engagement Yönetimi{% endblock %}
+{% block page_title %}Engagement Yönetimi{% endblock %}
+
+{% block content %}
+<div class="manage-layout">
+    <div class="manage-form-panel">
+        <div class="panel-title"><i class="fas fa-plus-circle"></i> Yeni Engagement</div>
+        <form id="add-engagement-form" class="manage-form">
+            <div class="field">
+                <label>Engagement Adı</label>
+                <input type="text" id="eng-name" required placeholder="Örn: Bank ABC Audit">
+            </div>
+            <div class="field">
+                <label>Müşteri</label>
+                <input type="text" id="eng-client" placeholder="Örn: Bank ABC">
+            </div>
+            <div class="field-row">
+                <div class="field">
+                    <label>Ünite</label>
+                    <select id="eng-category">
+                        {% for u in units %}<option value="{{ u.short_name }}">{{ u.short_name }}</option>{% endfor %}
+                    </select>
+                </div>
+                <div class="field">
+                    <label>Durum</label>
+                    <select id="eng-status">
+                        <option value="Active">Active</option>
+                        <option value="Pipeline">Pipeline</option>
+                        <option value="Completed">Completed</option>
+                    </select>
+                </div>
+            </div>
+            <div class="field-row">
+                <div class="field"><label>Başlangıç</label><input type="date" id="eng-start"></div>
+                <div class="field"><label>Bitiş</label><input type="date" id="eng-end"></div>
+            </div>
+            <button type="submit" class="submit-btn"><i class="fas fa-plus"></i> Engagement Ekle</button>
+        </form>
+    </div>
+
+    <div class="manage-list-panel">
+        <div class="panel-header">
+            <div class="panel-title"><i class="fas fa-briefcase"></i> Engagement'lar</div>
+            <input type="text" class="panel-filter" placeholder="Filtrele..." oninput="filterManageList(this.value, 'eng-list')">
+        </div>
+
+        <div class="manage-list" id="eng-list">
+            {% for unit in units %}
+            <div class="unit-group-header" style="border-left: 3px solid {{ unit.color }};">
+                <i class="{{ unit.icon }}"></i> {{ unit.short_name }}
+                <span class="count-badge">{{ engagements_by_unit[unit.short_name]|length }}</span>
+            </div>
+            {% for eng in engagements_by_unit[unit.short_name] %}
+            <div class="manage-item" id="eng-item-{{ eng.id }}">
+                <div class="manage-item-main">
+                    <div class="manage-item-info">
+                        <div class="manage-item-name">{{ eng.name }}</div>
+                        <div class="manage-item-meta">
+                            {{ eng.client or '—' }}
+                            <span class="tag tag-status-{{ eng.status|lower }}">{{ eng.status }}</span>
+                        </div>
+                    </div>
+                    <div class="manage-item-actions">
+                        <a href="{{ url_for('engagement_detail', engagement_id=eng.id) }}" class="action-btn" title="Detay"><i class="fas fa-external-link-alt"></i></a>
+                        <button class="action-btn action-delete" onclick="deleteEngagement({{ eng.id }})"><i class="fas fa-trash-alt"></i></button>
+                    </div>
+                </div>
+                <div class="manage-item-assign">
+                    <select id="person-select-{{ eng.id }}" class="assign-select">
+                        <option value="">+ Kişi ata...</option>
+                        {% for p in persons %}<option value="{{ p.id }}">{{ p.name }} — {{ p.title }}</option>{% endfor %}
+                    </select>
+                    <button class="assign-btn" onclick="addPersonToEngagement({{ eng.id }})"><i class="fas fa-user-plus"></i> Ata</button>
+                </div>
+            </div>
+            {% endfor %}
+            {% if not engagements_by_unit[unit.short_name] %}
+            <div class="manage-item" style="padding:12px 18px;color:var(--text-muted);font-size:0.8rem;font-style:italic;">Bu ünitede engagement yok</div>
+            {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('add-engagement-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    fetch('/api/engagement', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            name: document.getElementById('eng-name').value,
+            client: document.getElementById('eng-client').value,
+            category: document.getElementById('eng-category').value,
+            status: document.getElementById('eng-status').value,
+            start_date: document.getElementById('eng-start').value,
+            end_date: document.getElementById('eng-end').value,
+        })
+    }).then(r => r.json()).then(res => { if(res.success) location.reload(); });
+});
+
+function addPersonToEngagement(engId) {
+    const sel = document.getElementById('person-select-' + engId);
+    if (!sel.value) return;
+    fetch('/api/engagement/' + engId + '/add-person', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ person_id: parseInt(sel.value) })
+    }).then(r => r.json()).then(res => {
+        if (res.success) { showToast('Kişi atandı ✓'); sel.value = ''; }
+        else if (res.error) showToast(res.error);
+    });
+}
+
+function deleteEngagement(id) {
+    if (!confirm('Silinsin mi?')) return;
+    fetch('/api/engagement/' + id, { method: 'DELETE' })
+    .then(r => r.json()).then(res => {
+        if (res.success) { document.getElementById('eng-item-' + id).remove(); showToast('Silindi ✓'); }
+    });
+}
+</script>
+{% endblock %}

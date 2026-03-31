@@ -1,0 +1,460 @@
+{% extends "base.html" %}
+{% block title %}Ayarlar{% endblock %}
+{% block page_title %}Admin Ayarları{% endblock %}
+
+{% block content %}
+<div class="settings-layout">
+
+    <!-- Workspace -->
+    <div class="settings-section">
+        <div class="settings-card">
+            <div class="settings-card-header"><i class="fas fa-building"></i> Workspace</div>
+            <div class="settings-card-body">
+                <div class="setting-row">
+                    <div class="setting-info">
+                        <div class="setting-label">{{ workspace.name }}</div>
+                        <div class="setting-desc">Bu kodu ekibinizle paylaşarak davet edin</div>
+                    </div>
+                    <div class="setting-control">
+                        <div class="workspace-code-display">
+                            <span class="ws-code-text" id="ws-code">{{ workspace.code }}</span>
+                            <button onclick="copyCode()" class="copy-btn" title="Kopyala"><i class="fas fa-copy"></i></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Genel Ayarlar -->
+    <div class="settings-section">
+        <div class="settings-card">
+            <div class="settings-card-header"><i class="fas fa-sliders-h"></i> Genel Ayarlar</div>
+            <div class="settings-card-body">
+                <div class="setting-row" style="margin-bottom:16px;">
+                    <div class="setting-info">
+                        <div class="setting-label">Ana Sayfa Başlığı</div>
+                        <div class="setting-desc">Tüm ünitelerin listelendiği sayfanın adı (boş bırakılırsa "Ana Sayfa" görünür)</div>
+                    </div>
+                    <div class="setting-control">
+                        <input type="text" id="demand-name-input"
+                               value="{{ demand_name if demand_name != 'Ana Sayfa' else '' }}"
+                               class="setting-input"
+                               placeholder="Sayfa adı girin...">
+                        <button onclick="saveDemandName()" class="setting-save-btn"><i class="fas fa-check"></i></button>
+                    </div>
+                </div>
+                <div class="setting-row">
+                    <div class="setting-info">
+                        <div class="setting-label">Hafta Aralığı</div>
+                        <div class="setting-desc">Gantt chart'ta gösterilecek tarih aralığı (Pazartesi seçin)</div>
+                    </div>
+                    <div class="setting-control">
+                        <input type="date" id="week-start-input" value="{{ week_start }}" class="setting-input" style="width:150px;">
+                        <span style="color:var(--text-muted);font-size:0.8rem;">→</span>
+                        <input type="date" id="week-end-input" value="{{ week_end }}" class="setting-input" style="width:150px;">
+                        <button onclick="saveWeekRange()" class="setting-save-btn"><i class="fas fa-check"></i></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Title Yönetimi -->
+    <div class="settings-section">
+        <div class="settings-card">
+            <div class="settings-card-header">
+                <i class="fas fa-id-badge"></i> Title Yönetimi
+                <button class="add-btn-sm" onclick="toggleEl('add-title-form')"><i class="fas fa-plus"></i> Yeni Title</button>
+            </div>
+            <div class="add-unit-form" id="add-title-form" style="display:none;">
+                <div class="add-unit-fields">
+                    <input type="text" id="new-title-name" placeholder="Title adı" class="setting-input" style="flex:1;">
+                    <input type="number" id="new-title-order" placeholder="Sıra" class="setting-input" style="width:70px;" value="0">
+                    <button onclick="addTitle()" class="setting-save-btn"><i class="fas fa-plus"></i></button>
+                </div>
+            </div>
+            <div class="settings-card-body" style="padding:0;">
+                <div class="unit-list">
+                    {% for t in titles %}
+                    <div class="unit-row" id="title-row-{{ t.id }}">
+                        <div class="unit-row-icon"><i class="fas fa-id-badge"></i></div>
+                        <div class="unit-row-info" style="flex:1;"><strong>{{ t.name }}</strong></div>
+                        <div class="unit-row-order">Sıra: {{ t.sort_order }}</div>
+                        <div class="unit-row-actions">
+                            <button class="status-toggle-btn {% if t.is_active %}status-active{% else %}status-inactive{% endif %}" onclick="toggleTitle({{ t.id }})">
+                                <i class="fas {% if t.is_active %}fa-toggle-on{% else %}fa-toggle-off{% endif %}"></i>
+                            </button>
+                            <button class="action-btn action-delete" onclick="deleteTitle({{ t.id }})"><i class="fas fa-trash-alt"></i></button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                    {% if not titles %}
+                    <div class="manage-empty"><i class="fas fa-id-badge"></i><p>Henüz title eklenmemiş. Kişi eklemeden önce en az bir title oluşturun.</p></div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ünite Yönetimi -->
+    <div class="settings-section">
+        <div class="settings-card">
+            <div class="settings-card-header">
+                <i class="fas fa-sitemap"></i> Ünite Yönetimi
+                <button class="add-btn-sm" onclick="toggleEl('add-unit-form')"><i class="fas fa-plus"></i> Yeni Ünite</button>
+            </div>
+            <div class="add-unit-form" id="add-unit-form" style="display:none;">
+                <div class="add-unit-fields">
+                    <input type="text" id="new-unit-short" placeholder="Kısa (FS)" class="setting-input" style="width:80px;">
+                    <input type="text" id="new-unit-long" placeholder="Uzun isim" class="setting-input" style="flex:1;">
+
+                    <!-- İkon Seçici -->
+                    <div class="icon-picker-wrapper">
+                        <button type="button" class="icon-picker-btn" id="icon-picker-btn" onclick="toggleIconPicker()">
+                            <i class="fas fa-folder" id="selected-icon-preview"></i>
+                            <i class="fas fa-caret-down"></i>
+                        </button>
+                        <input type="hidden" id="new-unit-icon" value="fas fa-folder">
+                        <div class="icon-picker-dropdown" id="icon-picker-dropdown">
+                            <input type="text" class="icon-search" id="icon-search" placeholder="İkon ara..." oninput="filterIcons(this.value)">
+                            <div class="icon-grid" id="icon-grid"></div>
+                        </div>
+                    </div>
+
+                    <input type="color" id="new-unit-color" value="#6366f1" class="color-input">
+                    <input type="number" id="new-unit-order" placeholder="Sıra" class="setting-input" style="width:60px;" value="0">
+                    <button onclick="addUnit()" class="setting-save-btn"><i class="fas fa-plus"></i></button>
+                </div>
+            </div>
+            <div class="settings-card-body" style="padding:0;">
+                <div class="unit-list">
+                    {% for unit in units %}
+                    <div class="unit-row" id="unit-row-{{ unit.id }}">
+                        <div class="unit-row-color" style="background:{{ unit.color }};"></div>
+                        <div class="unit-row-icon"><i class="{{ unit.icon }}"></i></div>
+                        <div class="unit-row-info"><strong>{{ unit.short_name }}</strong><span>{{ unit.long_name }}</span></div>
+                        <div class="unit-row-order">Sıra: {{ unit.sort_order }}</div>
+                        <div class="unit-row-actions">
+                            <button class="status-toggle-btn {% if unit.is_active %}status-active{% else %}status-inactive{% endif %}" onclick="toggleUnit({{ unit.id }})">
+                                <i class="fas {% if unit.is_active %}fa-toggle-on{% else %}fa-toggle-off{% endif %}"></i>
+                            </button>
+                            <button class="action-btn action-delete" onclick="deleteUnit({{ unit.id }})"><i class="fas fa-trash-alt"></i></button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                    {% if not units %}
+                    <div class="manage-empty"><i class="fas fa-sitemap"></i><p>Henüz ünite eklenmemiş. Engagement eklemeden önce en az bir ünite oluşturun.</p></div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Kullanıcı Yönetimi -->
+    <div class="settings-section">
+        <div class="settings-card">
+            <div class="settings-card-header"><i class="fas fa-users-cog"></i> Kullanıcılar</div>
+            <div class="settings-card-body" style="padding:0;">
+                <div class="user-list">
+                    {% for user in users %}
+                    <div class="user-row" id="user-row-{{ user.id }}">
+                        <div class="user-row-avatar">{{ user.display_name[0] }}</div>
+                        <div class="user-row-info">
+                            <strong>{{ user.display_name }}</strong>
+                            <span>@{{ user.username }}</span>
+                        </div>
+                        <div class="user-row-meta">
+                            {% if user.last_login %}
+                            <small>{{ user.last_login.strftime('%d/%m %H:%M') }}</small>
+                            {% endif %}
+                        </div>
+                        <div class="user-row-actions">
+                            <select class="role-select" onchange="changeUserRole({{ user.id }},this.value)"
+                                    {% if user.id == current_user.id %}disabled{% endif %}>
+                                <option value="admin" {% if user.role=='admin' %}selected{% endif %}>Admin</option>
+                                <option value="user" {% if user.role=='user' %}selected{% endif %}>User</option>
+                            </select>
+                            {% if user.id != current_user.id %}
+                            <button class="action-btn action-delete" onclick="deleteUser({{ user.id }})">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// ============ İKON SEÇİCİ ============
+var ICON_LIST = [
+    {icon:'fas fa-building-columns',label:'Banka'},{icon:'fas fa-landmark',label:'Kurum'},
+    {icon:'fas fa-briefcase',label:'İş Çantası'},{icon:'fas fa-suitcase',label:'Bavul'},
+    {icon:'fas fa-coins',label:'Paralar'},{icon:'fas fa-money-bill-wave',label:'Banknot'},
+    {icon:'fas fa-credit-card',label:'Kart'},{icon:'fas fa-piggy-bank',label:'Kumbara'},
+    {icon:'fas fa-wallet',label:'Cüzdan'},{icon:'fas fa-chart-line',label:'Grafik'},
+    {icon:'fas fa-chart-bar',label:'Bar Grafik'},{icon:'fas fa-chart-pie',label:'Pasta Grafik'},
+    {icon:'fas fa-chart-area',label:'Alan Grafik'},{icon:'fas fa-arrow-trend-up',label:'Trend'},
+    {icon:'fas fa-scale-balanced',label:'Terazi'},{icon:'fas fa-receipt',label:'Fiş'},
+    {icon:'fas fa-file-invoice',label:'Fatura'},{icon:'fas fa-file-invoice-dollar',label:'Dolar Fatura'},
+    {icon:'fas fa-hand-holding-dollar',label:'Ödeme'},{icon:'fas fa-percent',label:'Yüzde'},
+    {icon:'fas fa-laptop-code',label:'Kod'},{icon:'fas fa-desktop',label:'Masaüstü'},
+    {icon:'fas fa-server',label:'Sunucu'},{icon:'fas fa-database',label:'Veritabanı'},
+    {icon:'fas fa-cloud',label:'Bulut'},{icon:'fas fa-shield-halved',label:'Güvenlik'},
+    {icon:'fas fa-lock',label:'Kilit'},{icon:'fas fa-code',label:'Kod Etiketi'},
+    {icon:'fas fa-microchip',label:'Çip'},{icon:'fas fa-robot',label:'Robot'},
+    {icon:'fas fa-wifi',label:'WiFi'},{icon:'fas fa-satellite-dish',label:'Anten'},
+    {icon:'fas fa-network-wired',label:'Ağ'},{icon:'fas fa-cogs',label:'Çarklar'},
+    {icon:'fas fa-gear',label:'Dişli'},{icon:'fas fa-gears',label:'Dişliler'},
+    {icon:'fas fa-wrench',label:'İngiliz Anahtarı'},{icon:'fas fa-screwdriver-wrench',label:'Alet'},
+    {icon:'fas fa-hammer',label:'Çekiç'},{icon:'fas fa-industry',label:'Fabrika'},
+    {icon:'fas fa-helmet-safety',label:'Kask'},{icon:'fas fa-users',label:'Ekip'},
+    {icon:'fas fa-user-tie',label:'Profesyonel'},{icon:'fas fa-people-group',label:'Grup'},
+    {icon:'fas fa-handshake',label:'Anlaşma'},{icon:'fas fa-user-shield',label:'Koruma'},
+    {icon:'fas fa-building',label:'Bina'},{icon:'fas fa-city',label:'Şehir'},
+    {icon:'fas fa-sitemap',label:'Organizasyon'},{icon:'fas fa-gavel',label:'Tokmak'},
+    {icon:'fas fa-balance-scale',label:'Adalet'},{icon:'fas fa-file-contract',label:'Sözleşme'},
+    {icon:'fas fa-stamp',label:'Damga'},{icon:'fas fa-book-open',label:'Kitap'},
+    {icon:'fas fa-scroll',label:'Parşömen'},{icon:'fas fa-heart-pulse',label:'Sağlık'},
+    {icon:'fas fa-hospital',label:'Hastane'},{icon:'fas fa-stethoscope',label:'Steteskop'},
+    {icon:'fas fa-graduation-cap',label:'Eğitim'},{icon:'fas fa-microscope',label:'Mikroskop'},
+    {icon:'fas fa-flask',label:'Deney'},{icon:'fas fa-atom',label:'Atom'},
+    {icon:'fas fa-truck',label:'Kamyon'},{icon:'fas fa-ship',label:'Gemi'},
+    {icon:'fas fa-plane',label:'Uçak'},{icon:'fas fa-warehouse',label:'Depo'},
+    {icon:'fas fa-boxes-stacked',label:'Kutular'},{icon:'fas fa-bolt',label:'Enerji'},
+    {icon:'fas fa-solar-panel',label:'Güneş'},{icon:'fas fa-wind',label:'Rüzgar'},
+    {icon:'fas fa-leaf',label:'Yaprak'},{icon:'fas fa-tree',label:'Ağaç'},
+    {icon:'fas fa-earth-americas',label:'Dünya'},{icon:'fas fa-recycle',label:'Geri Dönüşüm'},
+    {icon:'fas fa-fire',label:'Ateş'},{icon:'fas fa-droplet',label:'Su'},
+    {icon:'fas fa-folder',label:'Klasör'},{icon:'fas fa-folder-open',label:'Açık Klasör'},
+    {icon:'fas fa-star',label:'Yıldız'},{icon:'fas fa-flag',label:'Bayrak'},
+    {icon:'fas fa-trophy',label:'Kupa'},{icon:'fas fa-bullseye',label:'Hedef'},
+    {icon:'fas fa-rocket',label:'Roket'},{icon:'fas fa-puzzle-piece',label:'Puzzle'},
+    {icon:'fas fa-lightbulb',label:'Ampul'},{icon:'fas fa-magnifying-glass',label:'Büyüteç'},
+    {icon:'fas fa-compass',label:'Pusula'},{icon:'fas fa-map',label:'Harita'},
+    {icon:'fas fa-tags',label:'Etiketler'},{icon:'fas fa-layer-group',label:'Katmanlar'},
+    {icon:'fas fa-cubes',label:'Küpler'},{icon:'fas fa-wand-magic-sparkles',label:'Sihir'},
+    {icon:'fas fa-circle-nodes',label:'Ağ Düğümleri'},{icon:'fas fa-paint-brush',label:'Fırça'},
+    {icon:'fas fa-palette',label:'Palet'},{icon:'fas fa-camera',label:'Kamera'},
+    {icon:'fas fa-music',label:'Müzik'},{icon:'fas fa-gamepad',label:'Oyun'},
+    {icon:'fas fa-globe',label:'Küre'},{icon:'fas fa-phone',label:'Telefon'},
+    {icon:'fas fa-envelope',label:'Mektup'},{icon:'fas fa-bell',label:'Zil'},
+    {icon:'fas fa-calendar',label:'Takvim'},{icon:'fas fa-clock',label:'Saat'},
+    {icon:'fas fa-hourglass-half',label:'Kum Saati'},{icon:'fas fa-stopwatch',label:'Kronometre'},
+];
+
+function buildIconGrid() {
+    var grid = document.getElementById('icon-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+    for (var i = 0; i < ICON_LIST.length; i++) {
+        var item = ICON_LIST[i];
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'icon-grid-item';
+        btn.dataset.icon = item.icon;
+        btn.dataset.label = item.label.toLowerCase();
+        btn.title = item.label;
+        btn.innerHTML = '<i class="' + item.icon + '"></i>';
+        btn.addEventListener('click', function() {
+            selectIcon(this.dataset.icon);
+        });
+        grid.appendChild(btn);
+    }
+}
+
+function toggleIconPicker() {
+    var dd = document.getElementById('icon-picker-dropdown');
+    var btn = document.getElementById('icon-picker-btn');
+    var isOpen = dd.classList.contains('open');
+
+    if (isOpen) {
+        dd.classList.remove('open');
+    } else {
+        var rect = btn.getBoundingClientRect();
+        var ddWidth = 320;
+        var ddHeight = 380;
+
+        var left = rect.left;
+        if (left + ddWidth > window.innerWidth) left = window.innerWidth - ddWidth - 10;
+        if (left < 10) left = 10;
+
+        var top = rect.bottom + 6;
+        if (top + ddHeight > window.innerHeight) top = rect.top - ddHeight - 6;
+        if (top < 10) top = 10;
+
+        dd.style.left = left + 'px';
+        dd.style.top = top + 'px';
+        dd.classList.add('open');
+
+        document.getElementById('icon-search').value = '';
+        filterIcons('');
+        setTimeout(function() { document.getElementById('icon-search').focus(); }, 50);
+    }
+}
+
+function selectIcon(iconClass) {
+    document.getElementById('new-unit-icon').value = iconClass;
+    document.getElementById('selected-icon-preview').className = iconClass;
+    document.getElementById('icon-picker-dropdown').classList.remove('open');
+}
+
+function filterIcons(query) {
+    query = query.toLowerCase().trim();
+    var items = document.querySelectorAll('.icon-grid-item');
+    for (var i = 0; i < items.length; i++) {
+        var label = items[i].dataset.label;
+        var icon = items[i].dataset.icon.toLowerCase();
+        items[i].style.display = (!query || label.indexOf(query) >= 0 || icon.indexOf(query) >= 0) ? '' : 'none';
+    }
+}
+
+document.addEventListener('mousedown', function(e) {
+    var dd = document.getElementById('icon-picker-dropdown');
+    var btn = document.getElementById('icon-picker-btn');
+    if (dd && dd.classList.contains('open') && !dd.contains(e.target) && !btn.contains(e.target)) {
+        dd.classList.remove('open');
+    }
+});
+
+document.addEventListener('DOMContentLoaded', buildIconGrid);
+
+
+// ============ AYARLAR FONKSİYONLARI ============
+function toggleEl(id) {
+    var e = document.getElementById(id);
+    e.style.display = e.style.display === 'none' ? 'block' : 'none';
+}
+
+function copyCode() {
+    navigator.clipboard.writeText(document.getElementById('ws-code').textContent);
+    showToast('Kod kopyalandı!');
+}
+
+function saveDemandName() {
+    var val = document.getElementById('demand-name-input').value.trim();
+    fetch('/api/settings/demand-name', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({name: val})
+    }).then(function(r) { return r.json() }).then(function(res) {
+        if (res.success) {
+            showToast('Sayfa adı güncellendi ✓');
+            // Sidebar'daki ismi de anında güncelle
+            var sidebarLinks = document.querySelectorAll('.nav-item span');
+            for (var i = 0; i < sidebarLinks.length; i++) {
+                var parent = sidebarLinks[i].parentElement;
+                if (parent && parent.getAttribute('href') && parent.getAttribute('href').indexOf('ca-demand') >= 0) {
+                    sidebarLinks[i].textContent = val || 'Ana Sayfa';
+                }
+            }
+        }
+    });
+}
+
+function saveWeekRange() {
+    fetch('/api/settings/week-range', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            week_start: document.getElementById('week-start-input').value,
+            week_end: document.getElementById('week-end-input').value
+        })
+    }).then(function(r) { return r.json() }).then(function(res) {
+        if (res.success) showToast('Hafta aralığı güncellendi ✓ — Sayfa yenilenince aktif olacak');
+    });
+}
+
+function addTitle() {
+    var n = document.getElementById('new-title-name').value.trim();
+    if (!n) return;
+    fetch('/api/title', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({name: n, sort_order: parseInt(document.getElementById('new-title-order').value) || 0})
+    }).then(function(r) { return r.json() }).then(function(res) {
+        if (res.success) location.reload();
+        else if (res.error) showToast(res.error);
+    });
+}
+
+function toggleTitle(id) {
+    fetch('/api/title/' + id + '/toggle', {method: 'POST'})
+    .then(function(r) { return r.json() }).then(function(res) {
+        if (res.success) location.reload();
+    });
+}
+
+function deleteTitle(id) {
+    if (!confirm('Bu title silinsin mi?')) return;
+    fetch('/api/title/' + id, {method: 'DELETE'})
+    .then(function(r) { return r.json() }).then(function(res) {
+        if (res.success) {
+            document.getElementById('title-row-' + id).remove();
+            showToast('Silindi ✓');
+        }
+    });
+}
+
+function addUnit() {
+    fetch('/api/unit', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            short_name: document.getElementById('new-unit-short').value,
+            long_name: document.getElementById('new-unit-long').value,
+            icon: document.getElementById('new-unit-icon').value,
+            color: document.getElementById('new-unit-color').value,
+            sort_order: parseInt(document.getElementById('new-unit-order').value) || 0
+        })
+    }).then(function(r) { return r.json() }).then(function(res) {
+        if (res.success) location.reload();
+        else if (res.error) showToast(res.error);
+    });
+}
+
+function toggleUnit(id) {
+    fetch('/api/unit/' + id + '/toggle', {method: 'POST'})
+    .then(function(r) { return r.json() }).then(function(res) {
+        if (res.success) location.reload();
+    });
+}
+
+function deleteUnit(id) {
+    if (!confirm('Bu ünite silinsin mi?')) return;
+    fetch('/api/unit/' + id, {method: 'DELETE'})
+    .then(function(r) { return r.json() }).then(function(res) {
+        if (res.success) {
+            document.getElementById('unit-row-' + id).remove();
+            showToast('Silindi ✓');
+        }
+    });
+}
+
+function changeUserRole(id, role) {
+    fetch('/api/user/' + id + '/role', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({role: role})
+    }).then(function(r) { return r.json() }).then(function(res) {
+        if (res.success) showToast('Rol güncellendi ✓');
+        else if (res.error) showToast(res.error);
+    });
+}
+
+function deleteUser(id) {
+    if (!confirm('Bu kullanıcı silinsin mi?')) return;
+    fetch('/api/user/' + id, {method: 'DELETE'})
+    .then(function(r) { return r.json() }).then(function(res) {
+        if (res.success) {
+            document.getElementById('user-row-' + id).remove();
+            showToast('Silindi ✓');
+        }
+    });
+}
+</script>
+{% endblock %}
