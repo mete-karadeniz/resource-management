@@ -44,6 +44,11 @@
 
             <div class="nav-divider">Araçlar</div>
 
+            <a href="{{ url_for('utilization') }}" class="nav-item {% if request.endpoint == 'utilization' %}active{% endif %}">
+                <i class="fas fa-chart-bar"></i>
+                <span>Utilization</span>
+            </a>
+
             <a href="{{ url_for('search') }}" class="nav-item {% if request.endpoint == 'search' %}active{% endif %}">
                 <i class="fas fa-search"></i>
                 <span>Arama</span>

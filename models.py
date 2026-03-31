@@ -18,6 +18,7 @@ class Workspace(db.Model):
     persons = db.relationship('Person', backref='workspace', lazy=True, cascade='all, delete-orphan')
     engagements = db.relationship('Engagement', backref='workspace', lazy=True, cascade='all, delete-orphan')
     settings = db.relationship('AppSettings', backref='workspace', lazy=True, cascade='all, delete-orphan')
+    monthly_capacities = db.relationship('MonthlyCapacity', backref='workspace', lazy=True, cascade='all, delete-orphan')
 
     @staticmethod
     def generate_code():
@@ -53,6 +54,19 @@ class AppSettings(db.Model):
             s = AppSettings(workspace_id=workspace_id, key=key, value=value)
             db.session.add(s)
         db.session.commit()
+
+
+class MonthlyCapacity(db.Model):
+    __tablename__ = 'monthly_capacities'
+    id = db.Column(db.Integer, primary_key=True)
+    workspace_id = db.Column(db.Integer, db.ForeignKey('workspaces.id'), nullable=False)
+    year = db.Column(db.Integer, nullable=False)
+    month = db.Column(db.Integer, nullable=False)
+    hours = db.Column(db.Float, nullable=False, default=160)
+
+    __table_args__ = (
+        db.UniqueConstraint('workspace_id', 'year', 'month', name='unique_ws_month_cap'),
+    )
 
 
 class User(UserMixin, db.Model):
