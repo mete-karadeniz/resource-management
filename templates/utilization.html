@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block title %}Utilization - Resource Planner{% endblock %}
+{% block page_title %}Utilization{% endblock %}
+
+{% block content %}
+
+<!-- Capacity Ayarları (Sadece Admin) -->
+{% if current_user.is_admin() %}
+<div class="util-capacity-bar">
+    <div class="util-capacity-header">
+        <span><i class="fas fa-clock"></i> Aylık Kapasite (saat)</span>
+        <button class="btn btn-primary btn-sm" onclick="saveAllCapacities()">
+            <i class="fas fa-save"></i> Kaydet
+        </button>
+    </div>
+    <div class="util-capacity-months">
+        {% for m in month_info %}
+        <div class="util-cap-item">
+            <label>{{ m.short }} {{ m.year }}</label>
+            <input type="number" class="cap-input" min="0" max="300" step="1"
+                   data-year="{{ m.year }}" data-month="{{ m.month }}"
+                   value="{{ m.capacity|int if m.capacity > 0 else '' }}"
+                   placeholder="0">
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Utilization Tablosu -->
+<div class="util-table-card">
+    <div class="util-table-header">
+        <div class="util-table-title">
+            <i class="fas fa-chart-bar"></i> Kişi Bazlı Utilization
+            <span class="count-badge">{{ person_data|length }} kişi</span>
+        </div>
+        <div class="util-legend">
+            <span class="util-legend-item"><span class="util-legend-dot util-dot-low"></span> 0-50%</span>
+            <span class="util-legend-item"><span class="util-legend-dot util-dot-mid"></span> 50-85%</span>
+            <span class="util-legend-item"><span class="util-legend-dot util-dot-high"></span> 85-100%</span>
+            <span class="util-legend-item"><span class="util-legend-dot util-dot-over"></span> >100%</span>
+        </div>
+    </div>
+
+    <div class="util-table-container">
+        <table class="util-table">
+            <thead>
+                <tr>
+                    <th class="util-sticky-name">Kişi</th>
+                    <th class="util-sticky-title">Title</th>
+                    {% for m in month_info %}
+                    <th class="util-month-th">
+                        <div class="util-month-label">{{ m.short }}</div>
+                        <div class="util-month-year">{{ m.year }}</div>
+                        {% if m.capacity > 0 %}
+                        <div class="util-month-cap">{{ m.capacity|int }}h</div>
+                        {% else %}
+                        <div class="util-month-cap util-no-cap">—</div>
+                        {% endif %}
+                    </th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for pd in person_data %}
+                <tr>
+                    <td class="util-sticky-name">
+                        <a href="{{ url_for('person_detail', person_id=pd.person.id) }}" class="person-link">
+                            {{ pd.person.name }}
+                        </a>
+                    </td>
+                    <td class="util-sticky-title">{{ pd.person.title }}</td>
+                    {% for m in month_info %}
+                        {% set key = (m.year, m.month) %}
+                        {% set data = pd.months.get(key, {'booked':0,'capacity':0,'available':0,'pct':0}) %}
+                        <td class="util-cell">
+                            {% if data.capacity > 0 %}
+                            <div class="util-cell-inner {% if data.pct > 100 %}util-over{% elif data.pct >= 85 %}util-high{% elif data.pct >= 50 %}util-mid{% else %}util-low{% endif %}">
+                                <div class="util-cell-pct">{{ data.pct|int }}%</div>
+                                <div class="util-cell-hours">{{ data.booked|int }}h</div>
+                                <div class="util-cell-bar-wrap">
+                                    <div class="util-cell-bar" style="width: {{ [data.pct, 100]|min }}%"></div>
+                                </div>
+                                <div class="util-cell-avail">
+                                    {% if data.available > 0 %}
+                                        <span class="avail-pos">{{ data.available|int }}h müsait</span>
+                                    {% elif data.available < 0 %}
+                                        <span class="avail-neg">{{ (data.available * -1)|int }}h aşım</span>
+                                    {% else %}
+                                        <span class="avail-zero">Tam</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% else %}
+                            <div class="util-cell-inner util-no-data">
+                                {% if data.booked > 0 %}
+                                    <div class="util-cell-hours">{{ data.booked|int }}h</div>
+                                    <div class="util-cell-avail"><span class="avail-na">Kapasite yok</span></div>
+                                {% else %}
+                                    <span class="util-cell-empty">—</span>
+                                {% endif %}
+                            </div>
+                            {% endif %}
+                        </td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+
+                {% if not person_data %}
+                <tr>
+                    <td colspan="{{ month_info|length + 2 }}" class="text-center text-muted py-3">
+                        Aktif kişi bulunmuyor
+                    </td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% if current_user.is_admin() %}
+<script>
+function saveAllCapacities() {
+    var inputs = document.querySelectorAll('.cap-input');
+    var capacities = [];
+    for (var i = 0; i < inputs.length; i++) {
+        var val = parseFloat(inputs[i].value) || 0;
+        capacities.push({
+            year: parseInt(inputs[i].dataset.year),
+            month: parseInt(inputs[i].dataset.month),
+            hours: val
+        });
+    }
+    fetch('/api/capacity/bulk', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({capacities: capacities})
+    }).then(function(r) { return r.json() }).then(function(res) {
+        if (res.success) {
+            showToast('Kapasite kaydedildi ✓ — Sayfa yenileniyor...');
+            setTimeout(function() { location.reload(); }, 800);
+        }
+    });
+}
+</script>
+{% endif %}
+{% endblock %}
