@@ -39,7 +39,7 @@ def admin_required(f):
             if request.is_json or request.path.startswith('/api/'):
                 return jsonify({'success': False, 'error': 'Admin yetkisi gerekli'}), 403
             flash('Admin yetkisi gerekli.', 'error')
-            return redirect(url_for('ca_demand'))
+            return redirect(url_for('merge'))
         return f(*args, **kwargs)
     return decorated
 
@@ -152,7 +152,7 @@ def utility_processor():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
-        return redirect(url_for('ca_demand'))
+        return redirect(url_for('merge'))
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '')
@@ -166,14 +166,14 @@ def login():
         user.last_login = datetime.utcnow()
         db.session.commit()
         login_user(user, remember=True)
-        return redirect(request.args.get('next', url_for('ca_demand')))
+        return redirect(request.args.get('next', url_for('merge')))
     return render_template('login.html')
 
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if current_user.is_authenticated:
-        return redirect(url_for('ca_demand'))
+        return redirect(url_for('merge'))
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '')
@@ -223,7 +223,7 @@ def register():
             db.session.commit()
             flash(f'{ws.name} workspace\'ine katıldınız!', 'success')
             login_user(user, remember=True)
-            return redirect(url_for('ca_demand'))
+            return redirect(url_for('merge'))
 
     return render_template('register.html')
 
@@ -240,12 +240,12 @@ def logout():
 @app.route('/')
 @login_required
 def index():
-    return redirect(url_for('ca_demand'))
+    return redirect(url_for('merge'))
 
 
-@app.route('/ca-demand')
+@app.route('/merge')
 @login_required
-def ca_demand():
+def merge():
     weeks = get_ws_weeks()
     units = get_active_units()
     data = {}
@@ -270,7 +270,7 @@ def ca_demand():
                     Booking.week_start == w, Booking.engagement_id.in_(eids)).scalar() or 0
             ) if eids else 0
 
-    return render_template('ca_demand.html', weeks=weeks, data=data, units=units, cat_weekly_totals=cat_weekly_totals)
+    return render_template('merge.html', weeks=weeks, data=data, units=units, cat_weekly_totals=cat_weekly_totals)
 
 
 @app.route('/unit/<short_name>')
@@ -373,7 +373,7 @@ def engagement_detail(engagement_id):
 @app.route('/manage/engagements')
 @login_required
 def manage_engagements():
-    if not current_user.is_admin(): return redirect(url_for('ca_demand'))
+    if not current_user.is_admin(): return redirect(url_for('merge'))
     units = get_active_units()
     ebu = {u.short_name: Engagement.query.filter_by(workspace_id=ws_id(), category=u.short_name).order_by(Engagement.name).all() for u in units}
     persons = Person.query.filter_by(workspace_id=ws_id(), is_active=True).order_by(Person.name).all()
@@ -383,7 +383,7 @@ def manage_engagements():
 @app.route('/manage/people')
 @login_required
 def manage_people():
-    if not current_user.is_admin(): return redirect(url_for('ca_demand'))
+    if not current_user.is_admin(): return redirect(url_for('merge'))
     return render_template('manage_people.html',
                            people=Person.query.filter_by(workspace_id=ws_id()).order_by(Person.name).all(),
                            units=get_active_units())
@@ -392,7 +392,7 @@ def manage_people():
 @app.route('/admin/settings')
 @login_required
 def admin_settings():
-    if not current_user.is_admin(): return redirect(url_for('ca_demand'))
+    if not current_user.is_admin(): return redirect(url_for('merge'))
     wid = ws_id()
     week_start = AppSettings.get(wid, 'week_start', '')
     week_end = AppSettings.get(wid, 'week_end', '')
